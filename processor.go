@@ -320,6 +320,10 @@ func (p *processor) markAsDone(l *base.Lease, msg *base.TaskMessage) {
 // the task should not be retried and should be archived instead.
 var SkipRetry = errors.New("skip retry for the task")
 
+// SkipRetryNoArchive is used as a return value from Handler.ProcessTask to indicate that
+// the task should not be retried and should not be archived.
+var SkipRetryNoArchive = errors.New("skip retry and archiving for the task")
+
 func (p *processor) handleFailedMessage(ctx context.Context, l *base.Lease, msg *base.TaskMessage, err error) {
 	if p.errHandler != nil {
 		p.errHandler.HandleError(ctx, NewTask(msg.Type, msg.Payload), err)
@@ -329,9 +333,11 @@ func (p *processor) handleFailedMessage(ctx context.Context, l *base.Lease, msg 
 		p.retry(l, msg, err, false /*isFailure*/)
 		return
 	}
-	if msg.Retried >= msg.Retry || errors.Is(err, SkipRetry) {
+	if msg.Retried >= msg.Retry || errors.Is(err, SkipRetry) || errors.Is(err, SkipRetryNoArchive) {
 		p.logger.Warnf("Retry exhausted for task id=%s", msg.ID)
-		p.archive(l, msg, err)
+		if !errors.Is(err, SkipRetryNoArchive) {
+			p.archive(l, msg, err)
+		}
 	} else {
 		p.retry(l, msg, err, true /*isFailure*/)
 	}

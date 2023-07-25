@@ -816,10 +816,29 @@ func (r *RDB) Retry(ctx context.Context, msg *base.TaskMessage, processAt time.T
 	return r.runScript(ctx, op, retryCmd, keys, argv...)
 }
 
-const (
-	maxArchiveSize           = 10000 // maximum number of tasks in archive
-	archivedExpirationInDays = 90    // number of days before an archived task gets deleted permanently
+var (
+	defaultMaxArchiveSize           = 10000 // default maximum number of tasks in archive
+	defaultArchivedExpirationInDays = 90    // default number of days before an archived task gets deleted permanently
 )
+
+var (
+	maxArchiveSize           = defaultMaxArchiveSize           // maximum number of tasks in archive
+	archivedExpirationInDays = defaultArchivedExpirationInDays // number of days before an archived task gets deleted permanently
+)
+
+func SetMaxArchiveSize(size int) {
+	if size < 1 {
+		size = defaultMaxArchiveSize
+	}
+	maxArchiveSize = size
+}
+
+func SetArchivedExpirationInDays(days int) {
+	if days < 1 {
+		days = defaultArchivedExpirationInDays
+	}
+	archivedExpirationInDays = days
+}
 
 // KEYS[1] -> asynq:{<qname>}:t:<task_id>
 // KEYS[2] -> asynq:{<qname>}:active

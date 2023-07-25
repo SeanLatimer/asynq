@@ -15,10 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/hibiken/asynq/internal/base"
 	"github.com/hibiken/asynq/internal/log"
 	"github.com/hibiken/asynq/internal/rdb"
+	"github.com/redis/go-redis/v9"
 )
 
 // Server is responsible for task processing and task lifecycle management.
@@ -230,6 +230,10 @@ type Config struct {
 	//
 	// If unset or nil, the group aggregation feature will be disabled on the server.
 	GroupAggregator GroupAggregator
+
+	MaxArchiveSize int
+
+	ArchivedExpirationInDays int
 }
 
 // GroupAggregator aggregates a group of tasks into one before the tasks are passed to the Handler.
@@ -461,6 +465,8 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 	}
 	logger.SetLevel(toInternalLogLevel(loglevel))
 
+	rdb.SetArchivedExpirationInDays(cfg.ArchivedExpirationInDays)
+	rdb.SetMaxArchiveSize(cfg.MaxArchiveSize)
 	rdb := rdb.NewRDB(c)
 	starting := make(chan *workerInfo)
 	finished := make(chan *base.TaskMessage)
@@ -572,6 +578,9 @@ func NewServer(r RedisConnOpt, cfg Config) *Server {
 // One exception to this rule is when ProcessTask returns a SkipRetry error.
 // If the returned error is SkipRetry or an error wraps SkipRetry, retry is
 // skipped and the task will be immediately archived instead.
+//
+// If an error is return is or wraps SkipRetryNoArchive, retries are skipped and
+// the task will not be archived.
 type Handler interface {
 	ProcessTask(context.Context, *Task) error
 }
